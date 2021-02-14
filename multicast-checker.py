@@ -1,37 +1,55 @@
-#  sudo -u super /Applications/VLC.app/Contents/MacOS/VLC -vvv --intf dummy /Users/super/Movies/web/stewart-lee.mp4 --sout udp://233.99.65.1:1234 --loop
+# Script will parse the input *.m3u playlist file and check all the channels inside.
+# In case if the channel is not working (no data eceived) and email can be send.
+# Please read the manual (run the script with -h parameter)
 
+import argparse
 import socket
 import struct
 import select
 import smtplib
+import re
+import time
+import os
 
 # Setup the command line argument parsing
 parser = argparse.ArgumentParser(description='Script to check the IPTV UDP streams from m3u playlist')
 
-parser.add_argument("--playlist", help="Playlist with UDP streams", required=True)
-parser.add_argument("--timeout", help="Time to wait before checks in seconds", default=600)
-parser.add_argument("--smtp_server", help="SMTP server to send an email", required=False)
-parser.add_argument("--smtp_port", help="Port for SMTP server", required=False, default=25)
-parser.add_argument("--sender", help="email address for email sender", required=False)
-parser.add_argument("--recievers", help="emails of the receivers (comma separated)", required=False)
+parser.add_argument("--playlist",		help="Playlist *.m3u file with UDP streams",		required=True)
+parser.add_argument("--timeout",		help="Time to wait before checks in seconds",		default=600)
+parser.add_argument("--smtp_server",	help="SMTP server to send an email",				required=False)
+parser.add_argument("--smtp_port",		help="Port for SMTP server", 						default=25)
+parser.add_argument("--sender",			help="email address for email sender",				required=False)
+parser.add_argument("--recievers",		help="emails of the receivers (comma separated)",	required=False)
 
-def playlist_parser(playlist)
+def playlist_parser(playlist):
 	""" Function that returns a dictionary of UDP streams"""
 	
 	# Defining the variables
 	channel_name = ''
 	channel_address = ''
-	channel_port = ''
+
+	# Defininfg regular expression for strings
+	channel_name_re = re.compile(r'(?<=#EXTINF:2,)(.*)(?=$)')
+	channel_address_re = re.compile(r'(?<=@)(.*)(?=$)')
+
+	# Create a dictionary
+	dictionary = {}
 
 	with open(playlist) as playlist:
-	  counter = 0
+		for counter, line in enumerate(playlist):
+			if re.findall(channel_name_re ,line):
+				channel_name = re.search(channel_name_re,line).group()
+				channel_address = re.search(channel_address_re, playlist.readline()).group()
+				dictionary[channel_name] = channel_address
+	
+	# Close the playlist file and return the dictionary with UDP streams
+	playlist.close()
+	
+	return dictionary
 
+def channel_checker(channel_address, channel_port):
+	""" Function to check the given UDP stream """
 
-
-	# Close the file and return the dictionary with UDP streams
-	file.close()
-
-def channel_checker(channel_address, channel_port)
 	# Creating the socket
 	# AF_INET address family represented by a pair (host, port)
 	# SOCK_DGRAM is a UDP socket type for datagram-based protocol
@@ -46,7 +64,7 @@ def channel_checker(channel_address, channel_port)
 	# 1 representing a buffer
 	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-	sock.bind(('', channel_port))
+	sock.bind(('', int(channel_port)))
 
 	# Pack and format the socket data as following:
 	# '4sl' format: 4 - nember of bytes, s - char[] to bytes, l - long to integer
@@ -75,22 +93,42 @@ def channel_checker(channel_address, channel_port)
 def send_email(smtp_server, smtp_port, sender, receivers, channel_name, channel_addr, channel_port):
 	""" Function to send an email when IPTV channel failed to play"""
 
-	message = f'From: <{sender}>\
+	message = f'From: {sender}\
 	To: {receivers}\
 	Subject: IPTV stream issue for "{channel_name}" channel\n\
 	The channel "{channel_name}" is not working\n\
-	Address: {channel_addr}'
+	Address: {channel_addr}:{channel_port}'
 
 	try:
 	   smtpObj = smtplib.SMTP(smtp_server, smtp_port)
 	   smtpObj.sendmail(sender, receivers, message)         
-	   print (f'An email has been sent')
+	   print(f'[*] An email has been sent')
 	except SMTPException:
-	   print "Error: unable to send an email"
+	   print(f'[*] Error: unable to send an email')
 
+# Define the script arguments as a <args> variable
 args = parser.parse_args()
 
-channels = playlist_parser(args.playlist)
+# Check the input playlist file
+if not os.path.isfile(args.playlist):
+    print('Please specify the correct file!')
+    exit()
 
+# Get the dictionary of UDP channels
+channels_dictionary = playlist_parser(args.playlist)
+
+# Main program's loop
 while True:
+	# Check each channel in dictionary
+	for channel in channels_dictionary:
+		channel_address, channel_port = channels_dictionary[channel].split(':')
+		result = channel_checker(channel_address, channel_port)
+		if result == 0:
+			print(f'[*] OK >>> Channel "{channel}" is working!')
+		else:
+			print(f'[*] !!! PROBLEM !!! Channel "{channel}" is not working!')
+			send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel_address, channel_port)
 	
+	# Wait 10 minutes (default) to repeat
+	print(f'\nWaiting for {args.timeout} second(s) to repeat the check...\n')
+	time.sleep(int(args.timeout))
