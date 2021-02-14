@@ -1,3 +1,7 @@
+# User defined
+playlist_parser.py
+test.m3u
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
