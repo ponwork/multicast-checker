@@ -10,6 +10,7 @@ import smtplib
 import re
 import time
 import os
+import sys
 from email.mime.text import MIMEText
 
 # Setup the command line argument parsing
@@ -135,7 +136,7 @@ while True:
 		# Wait 10 minutes (default) to repeat
 		print(f'\nWaiting for {args.timeout} second(s) to repeat the check...\n')
 		time.sleep(int(args.timeout))
-		
+
 	except KeyboardInterrupt:
-        print('[*] Script has been closed!')
-        sys.exit()
+		print('\n[*] Script has been closed!')
+		sys.exit()
