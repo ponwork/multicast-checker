@@ -122,15 +122,20 @@ channels_dictionary = playlist_parser(args.playlist)
 # Main program's loop
 while True:
 	# Check each channel in dictionary
-	for channel in channels_dictionary:
-		channel_address, channel_port = channels_dictionary[channel].split(':')
-		result = channel_checker(channel_address, channel_port, args.nic_ip)
-		if result == 0:
-			print(f'[*] OK >>> Channel "{channel}" is working!')
-		else:
-			print(f'[*] !!! PROBLEM !!! Channel "{channel}" is not working!')
-			send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
-	
-	# Wait 10 minutes (default) to repeat
-	print(f'\nWaiting for {args.timeout} second(s) to repeat the check...\n')
-	time.sleep(int(args.timeout))
+	try:
+		for channel in channels_dictionary:
+			channel_address, channel_port = channels_dictionary[channel].split(':')
+			result = channel_checker(channel_address, channel_port, args.nic_ip)
+			if result == 0:
+				print(f'[*] OK >>> Channel "{channel}" is working!')
+			else:
+				print(f'[*] !!! PROBLEM !!! Channel "{channel}" is not working!')
+				send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
+		
+		# Wait 10 minutes (default) to repeat
+		print(f'\nWaiting for {args.timeout} second(s) to repeat the check...\n')
+		time.sleep(int(args.timeout))
+		
+	except KeyboardInterrupt:
+        print('[*] Script has been closed!')
+        sys.exit()
