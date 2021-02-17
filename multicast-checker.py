@@ -113,8 +113,8 @@ args = parser.parse_args()
 
 # Check the input playlist file
 if not os.path.isfile(args.playlist):
-    print('Please specify the correct file!')
-    exit()
+	print('Please specify the correct file!')
+	exit()
 
 # Get the dictionary of UDP channels
 channels_dictionary = playlist_parser(args.playlist)
