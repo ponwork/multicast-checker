@@ -8,7 +8,6 @@ import struct
 import select
 import smtplib
 import re
-import time
 import os
 import sys
 from email.mime.text import MIMEText
@@ -17,7 +16,6 @@ from email.mime.text import MIMEText
 parser = argparse.ArgumentParser(description='Script to check the IPTV UDP streams from m3u playlist')
 
 parser.add_argument("--playlist",		help="Playlist *.m3u file with UDP streams",			required=True)
-parser.add_argument("--timeout",		help="Time to wait before checks in seconds",			default=600)
 parser.add_argument("--smtp_server",	help="SMTP server to send an email",					required=False)
 parser.add_argument("--smtp_port",		help="Port for SMTP server", 							default=25)
 parser.add_argument("--sender",			help="email address for email sender",					required=False)
@@ -83,8 +81,8 @@ def channel_checker(channel_address, channel_port, nic_ip):
 	# Apply non-blocking mode
 	sock.setblocking(0)
 
-	# Check that socket is ready with 1 sec timeout
-	ready = select.select([sock], [], [], 1)
+	# Check that socket is ready with 10 sec timeout
+	ready = select.select([sock], [], [], 10)
 
 	if ready[0]:
 		# Get the 1024 bytes of IPTV channel data
@@ -120,23 +118,18 @@ if not os.path.isfile(args.playlist):
 # Get the dictionary of UDP channels
 channels_dictionary = playlist_parser(args.playlist)
 
-# Main program's loop
-while True:
-	# Check each channel in dictionary
-	try:
-		for channel in channels_dictionary:
-			channel_address, channel_port = channels_dictionary[channel].split(':')
-			result = channel_checker(channel_address, channel_port, args.nic_ip)
-			if result == 0:
-				print(f'[*] OK >>> Channel "{channel}" is working!')
-			else:
-				print(f'[*] !!! PROBLEM !!! Channel "{channel}" is not working!')
-				send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
-		
-		# Wait 10 minutes (default) to repeat
-		print(f'\nWaiting for {args.timeout} second(s) to repeat the check...\n')
-		time.sleep(int(args.timeout))
+# Main
+# Check each channel in dictionary
+try:
+	for channel in channels_dictionary:
+		channel_address, channel_port = channels_dictionary[channel].split(':')
+		result = channel_checker(channel_address, channel_port, args.nic_ip)
+		if result == 0:
+			print(f'[*] OK >>> Channel "{channel}" is working!')
+		else:
+			print(f'[*] !!! PROBLEM !!! Channel "{channel}" is not working!')
+			send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
 
-	except KeyboardInterrupt:
-		print('\n[*] Script has been closed!')
-		sys.exit()
+except KeyboardInterrupt:
+	print('\n[*] Script has been closed!')
+	sys.exit()
