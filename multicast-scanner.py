@@ -26,6 +26,9 @@ parser.add_argument("--range",		help="Range of IPs to scan. Default: 224.0.0.0/2
 # Define the variable for the dictionary
 channels_dictionary = []
 
+# Define functions
+# ================
+
 def playlist_add(ip, port, id):
 	""" Add the given IP and port to the playlist file"""
 	
@@ -158,6 +161,9 @@ def udp_pors_parser(channels_dictionary):
 
 	return port_list
 
+# ================
+# End of functions
+
 # Define the script arguments as a <args> variable
 args = parser.parse_args()
 
@@ -189,8 +195,8 @@ if args.port:
 try:
 	ip_list = ipaddress.IPv4Network(args.range)
 except:
-	print('\n[*] Please define a proper IP range.\n[*] >>> Example: 224.0.0.0/24\n')
-	sys.exit()
+	print(f'\n[*] Please define a proper IP range.\n[*] >>> Example: 224.0.0.0/24\n')
+	exit()
 
 # Prepare the resulting playlist file
 # ===================================
@@ -198,7 +204,7 @@ except:
 currentPath = os.path.dirname(os.path.realpath(__file__))
 
 # Define the playlist file name
-playlistFileName = 'scan_results.m3u'
+playlistFileName = f'scan_results_range_{args.range.split("/")[0]}-{args.range.split("/")[1]}.m3u'
 playlistFile = os.path.join(currentPath, playlistFileName)
 
 # Open the playlist file

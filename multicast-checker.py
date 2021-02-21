@@ -20,8 +20,11 @@ parser.add_argument("--smtp_server",	help="SMTP server to send an email",					re
 parser.add_argument("--smtp_port",		help="Port for SMTP server", 							required=False, default=25)
 parser.add_argument("--timeout",		help="Time to wait in seconds for the UPD stream", 		required=False, default=5)
 parser.add_argument("--sender",			help="email address for email sender",					required=False)
-parser.add_argument("--receivers",		help="emails of the receivers (comma separated)",		required=False, action='append')
+parser.add_argument("--receivers",		help="emails of the receivers (space separated)",		required=False, nargs='+')
 parser.add_argument("--nic_ip",			help="network interface IP address with UDP stream",	required=False, default='')
+
+# Define functions
+# ================
 
 def playlist_parser(playlist):
 	""" Function that returns a dictionary of UDP streams"""
@@ -92,10 +95,10 @@ def channel_checker(channel_address, channel_port, nic_ip, timeout):
 	else:
 		return 1
 
-def send_email(smtp_server, smtp_port, sender, receivers, channel_name, channel_addr, channel_port):
+def send_email(smtp_server, smtp_port, sender, receivers, channels_not_working):
 	""" Function to send an email when IPTV channel failed to play"""
 
-	msg = MIMEText(f'The channel "{channel_name}" is not working\nAddress: {channel_addr}:{channel_port}')
+	msg = MIMEText(f'The following channel(s) are not working:\n\n{channels_not_working}\n')
 	msg['Subject'] = f'IPTV stream issue for "{channel_name}" channel'
 	msg['From'] = f'{sender}'
 	msg['To'] = f'{receivers}'
@@ -107,37 +110,48 @@ def send_email(smtp_server, smtp_port, sender, receivers, channel_name, channel_
 	except SMTPException:
 		print(f'[*] Error: unable to send an email')
 
+# ================
+# End of functions
 
 # Define the script arguments as a <args> variable
 args = parser.parse_args()
 
-# Check the input playlist file
+# Check the user's input (playlist file)
 if not os.path.isfile(args.playlist):
 	print("[*] Please specify the correct playlist file's name!")
-	exit()
+	sys.exit()
 
 # Get the dictionary of UDP channels
 channels_dictionary = playlist_parser(args.playlist)
 
-# Check the email parameters
+# Check the user's input (email parameters)
 email_set = 0
 if args.smtp_server and args.smtp_port and args.sender and args.receivers:
 	email_set = 1
 else:
-	print(f'[*] Email parameters are not defined.\n[*] Run the script with -h parameter for the details.\n\n')
+	print(f'[*] Email parameters are not defined.\n[*] Run the script with -h parameter for the details.\n')
 
-# Main
-# Check each channel in dictionary
+# Main program
 try:
+	# Define a string for the non-working channels
+	channels_not_working = ''
+
+	# Check each channel in dictionary
 	for channel in channels_dictionary:
 		channel_address, channel_port = channels_dictionary[channel].split(':')
 		result = channel_checker(channel_address, channel_port, args.nic_ip, args.timeout)
 		if result == 0:
 			print(f'[*] OK >>> Channel is working! >>> "{channel}"')
 		else:
-			print(f'[*] !!! PROBLEM !!! Channel is not working!" >>> {channel}"')
-			if email_set == 1:
-				send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
+			# Add the broken channel to the list
+			channels_not_working += f'{channel_address}:{channel_port} - {channel}\n'
+	
+	if email_set == 1 and channels_not_working != '':
+		send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channels_not_working)
+
+	# Print the list of broken channels
+	if channels_not_working != '':
+		print(f'\n[*] The following channel(s) are not working:\n\n{channels_not_working}\n')
 
 except KeyboardInterrupt:
 	print('\n[*] Script has been closed!')
