@@ -17,10 +17,11 @@ parser = argparse.ArgumentParser(description='Script to check the IPTV UDP strea
 
 parser.add_argument("--playlist",		help="Playlist *.m3u file with UDP streams",			required=True)
 parser.add_argument("--smtp_server",	help="SMTP server to send an email",					required=False)
-parser.add_argument("--smtp_port",		help="Port for SMTP server", 							default=25)
+parser.add_argument("--smtp_port",		help="Port for SMTP server", 							required=False, default=25)
+parser.add_argument("--timeout",		help="Time to wait in seconds for the UPD stream", 		required=False, default=5)
 parser.add_argument("--sender",			help="email address for email sender",					required=False)
 parser.add_argument("--receivers",		help="emails of the receivers (comma separated)",		required=False, action='append')
-parser.add_argument("--nic_ip",			help="network interface IP address with UDP stream",	default='', required=False)
+parser.add_argument("--nic_ip",			help="network interface IP address with UDP stream",	required=False, default='')
 
 def playlist_parser(playlist):
 	""" Function that returns a dictionary of UDP streams"""
@@ -48,7 +49,7 @@ def playlist_parser(playlist):
 	
 	return dictionary
 
-def channel_checker(channel_address, channel_port, nic_ip):
+def channel_checker(channel_address, channel_port, nic_ip, timeout):
 	""" Function to check the given UDP stream """
 
 	# Creating the socket
@@ -81,8 +82,8 @@ def channel_checker(channel_address, channel_port, nic_ip):
 	# Apply non-blocking mode
 	sock.setblocking(0)
 
-	# Check that socket is ready with 10 sec timeout
-	ready = select.select([sock], [], [], 10)
+	# Check that socket is ready with the timeout
+	ready = select.select([sock], [], [], timeout)
 
 	if ready[0]:
 		# Get the 1024 bytes of IPTV channel data
@@ -112,7 +113,7 @@ args = parser.parse_args()
 
 # Check the input playlist file
 if not os.path.isfile(args.playlist):
-	print('Please specify the correct file!')
+	print("[*] Please specify the correct playlist file's name!")
 	exit()
 
 # Get the dictionary of UDP channels
@@ -123,12 +124,15 @@ channels_dictionary = playlist_parser(args.playlist)
 try:
 	for channel in channels_dictionary:
 		channel_address, channel_port = channels_dictionary[channel].split(':')
-		result = channel_checker(channel_address, channel_port, args.nic_ip)
+		result = channel_checker(channel_address, channel_port, args.nic_ip, args.timeout)
 		if result == 0:
-			print(f'[*] OK >>> Channel "{channel}" is working!')
+			print(f'[*] OK >>> Channel is working! >>> "{channel}"')
 		else:
-			print(f'[*] !!! PROBLEM !!! Channel "{channel}" is not working!')
-			send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
+			print(f'[*] !!! PROBLEM !!! Channel is not working!" >>> {channel}"')
+			if args.smtp_server and args.smtp_port and args.sender and args.receivers:
+				send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
+			else:
+				print(f'[*] Email parameters are not defined. Please specify.\n[*] Run the script with -h parameter for the details.')
 
 except KeyboardInterrupt:
 	print('\n[*] Script has been closed!')
