@@ -33,16 +33,16 @@ def playlist_add(ip, port, id):
 	global playlistFile
 
 	# Open the file
-	playlistFile = open(playlistFile, 'a')
+	file = open(playlistFile, 'a')
 
 	# Add the channel name line
-	playlistFile.write(f'#EXTINF:2,Channel #{id}\n')
+	file.write(f'#EXTINF:2,Channel #{id}\n')
 
 	#Add the channel address
-	playlistFile.write(f'udp://@{ip}:{port}')
+	file.write(f'udp://@{ip}:{port}\n')
 
 	# Close the file and exit
-	playlistFile.close()
+	file.close()
 	print(f'[*] !!! Channel added to the playlist !!!\n')
 
 	return 0
@@ -58,14 +58,15 @@ def ip_scanner(ip_list, port_list):
 		for port in port_list:
 			result = channel_checker(str(ip), port, args.nic)
 			if result == 0:
-				counter += 1
 				print(f'\n[*] !!! Channel found !!! {str(ip)}:{port}')
 				if args.playlist:
 					if f'{str(ip)}:{port}' not in list(channels_dictionary.values()):
+						counter += 1
 						playlist_add(ip, port, counter)
 					else:
 						print(f'[*] The channel is already in the playlist\n')
 				else:
+					counter += 1
 					playlist_add(ip, port, counter)
 			else:
 				print(f'[*] No stream found for: {str(ip)}:{port}')
