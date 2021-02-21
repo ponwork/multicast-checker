@@ -13,15 +13,22 @@ import os
 import re
 import sys
 import ipaddress
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Setup the command line argument parsing
 parser = argparse.ArgumentParser(description='Script to check the IPTV UDP streams from m3u playlist')
 
-parser.add_argument("--playlist",	help="Playlist *.m3u file with UDP streams",			required=False)
-parser.add_argument("--nic",		help="network interface IP address with UDP stream",	required=False, default='')
-parser.add_argument("--timeout",	help="Time to wait in seconds for the UPD stream", 		required=False, default=5)
-parser.add_argument("--port",		help="addtional UDP port to scan. Default: 1234",		required=False, default=['1234'], nargs='+')
-parser.add_argument("--range",		help="Range of IPs to scan. Default: 224.0.0.0/24",		required=False, default='224.0.0.0/24')
+parser.add_argument("--playlist",		help="Playlist *.m3u file with UDP streams",			required=False)
+parser.add_argument("--nic",			help="network interface IP address with UDP stream",	required=False, default='')
+parser.add_argument("--timeout",		help="Time to wait in seconds for the UPD stream", 		required=False, default=5)
+parser.add_argument("--port",			help="addtional UDP port to scan. Default: 1234",		required=False, default=['1234'], nargs='+')
+parser.add_argument("--range",			help="Range of IPs to scan. Default: 224.0.0.0/24",		required=False, default='224.0.0.0/24')
+parser.add_argument("--smtp_server",	help="SMTP server to send an email",					required=False)
+parser.add_argument("--smtp_port",		help="Port for SMTP server", 							required=False, default=25)
+parser.add_argument("--sender",			help="email address for email sender",					required=False)
+parser.add_argument("--receivers",		help="emails of the receivers (space separated)",		required=False, nargs='+')
 
 # Define the variable for the dictionary
 channels_dictionary = []
@@ -161,6 +168,34 @@ def udp_pors_parser(channels_dictionary):
 
 	return port_list
 
+def send_email(smtp_server, smtp_port, sender, receivers, attachment, attachment_name):
+	""" Function to send an email with an attached file of the scan result """
+
+	global args
+
+	# Define the email's main parts
+	msg = MIMEMultipart()
+	msg['Subject'] = f'IPTV scan results for "{str(args.range)}" range'
+	msg['From'] = f'{sender}'
+	msg['To'] = f'{receivers}'
+	
+	# Email message's body
+	msg_body = f'The following channel(s) were found (see attached)\n{attachment_name}\n'
+	msg_body = MIMEText(msg_body) # convert the body to a MIME compatible string
+	msg.attach(msg_body) # attach it to your main message
+
+	# Add attachment file
+	email_attach = MIMEText(open(attachment).read())
+	email_attach.add_header('Content-Disposition', 'attachment', filename=attachment_name)           
+	msg.attach(email_attach)
+
+	try:
+		smtpObj = smtplib.SMTP(smtp_server, smtp_port)
+		smtpObj.sendmail(sender, receivers, msg.as_string())
+		print(f'[*] An email has been sent')
+	except SMTPException:
+		print(f'[*] Error: unable to send an email')
+
 # ================
 # End of functions
 
@@ -213,6 +248,7 @@ file = open(playlistFile, 'w')
 # Add the first line (header) and close the file
 file.write(f'#EXTM3U\n')
 file.close()
+print(f'[*] Resulting file: {playlistFile}')
 # ===================================
 
 # Calculating totals
@@ -246,6 +282,11 @@ try:
 
 	# Run the scanner
 	ip_scanner(ip_list, port_list)
+
+	# Send an email with the resulting file
+	if args.smtp_server and args.smtp_port and args.sender and args.receivers:
+		send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, playlistFile, playlistFileName)
+
 	exit()
 
 except KeyboardInterrupt:
