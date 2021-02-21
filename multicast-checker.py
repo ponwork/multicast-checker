@@ -27,7 +27,7 @@ parser.add_argument("--nic_ip",			help="network interface IP address with UDP st
 # ================
 
 def playlist_parser(playlist):
-	""" Function that returns a dictionary of UDP streams"""
+	""" Function that returns a dictionary of UDP streams """
 	
 	# Defining the variables
 	channel_name = ''
@@ -96,7 +96,7 @@ def channel_checker(channel_address, channel_port, nic_ip, timeout):
 		return 1
 
 def send_email(smtp_server, smtp_port, sender, receivers, channels_not_working):
-	""" Function to send an email when IPTV channel failed to play"""
+	""" Function to send an email when IPTV channel failed to play """
 
 	msg = MIMEText(f'The following channel(s) are not working:\n\n{channels_not_working}\n')
 	msg['Subject'] = f'IPTV stream issue for "{channel_name}" channel'
