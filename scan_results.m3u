@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:2,Channel #1
+udp://@233.99.65.3:1234

@@ -119,6 +119,13 @@ if not os.path.isfile(args.playlist):
 # Get the dictionary of UDP channels
 channels_dictionary = playlist_parser(args.playlist)
 
+# Check the email parameters
+email_set = 0
+if args.smtp_server and args.smtp_port and args.sender and args.receivers:
+	email_set = 1
+else:
+	print(f'[*] Email parameters are not defined.\n[*] Run the script with -h parameter for the details.\n\n')
+
 # Main
 # Check each channel in dictionary
 try:
@@ -129,10 +136,8 @@ try:
 			print(f'[*] OK >>> Channel is working! >>> "{channel}"')
 		else:
 			print(f'[*] !!! PROBLEM !!! Channel is not working!" >>> {channel}"')
-			if args.smtp_server and args.smtp_port and args.sender and args.receivers:
+			if email_set == 1:
 				send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channel, channel_address, channel_port)
-			else:
-				print(f'[*] Email parameters are not defined. Please specify.\n[*] Run the script with -h parameter for the details.')
 
 except KeyboardInterrupt:
 	print('\n[*] Script has been closed!')
