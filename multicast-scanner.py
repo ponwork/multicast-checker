@@ -43,16 +43,14 @@ def playlist_add(ip, port, id):
 	global playlistFile
 
 	# Open the file
-	file = open(playlistFile, 'a')
+	with open(playlistFile, 'a') as file:
 
-	# Add the channel name line
-	file.write(f'#EXTINF:2,Channel #{id}\n')
+		# Add the channel name line
+		file.write(f'#EXTINF:2,Channel #{id}\n')
 
-	#Add the channel address
-	file.write(f'udp://@{ip}:{port}\n')
+		#Add the channel address
+		file.write(f'udp://@{ip}:{port}\n')
 
-	# Close the file and exit
-	file.close()
 	print(f'[*] !!! Channel added to the playlist !!!\n')
 
 	return 0
@@ -139,15 +137,13 @@ def playlist_parser(playlist):
 	# Create a dictionary
 	dictionary = {}
 
+	# Open the playlist file and write the data to the dictionary
 	with open(playlist) as playlist:
 		for counter, line in enumerate(playlist):
 			if re.findall(channel_name_re ,line):
 				channel_name = re.search(channel_name_re,line).group()
 				channel_address = re.search(channel_address_re, playlist.readline()).group()
 				dictionary[channel_name] = channel_address
-	
-	# Close the playlist file and return the dictionary with UDP streams
-	playlist.close()
 	
 	return dictionary
 
@@ -242,12 +238,10 @@ currentPath = os.path.dirname(os.path.realpath(__file__))
 playlistFileName = f'scan_results_range_{args.range.split("/")[0]}-{args.range.split("/")[1]}.m3u'
 playlistFile = os.path.join(currentPath, playlistFileName)
 
-# Open the playlist file
-file = open(playlistFile, 'w')
+# Open the playlist file and add the first line (header)
+with open(playlistFile, 'w') as file:
+	file.write(f'#EXTM3U\n')
 
-# Add the first line (header) and close the file
-file.write(f'#EXTM3U\n')
-file.close()
 print(f'[*] Resulting file: {playlistFile}')
 # ===================================
 
