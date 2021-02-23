@@ -229,6 +229,13 @@ except:
     print(f'\n[*] Please define a proper IP range.\n[*] >>> Example: 224.0.0.0/24\n')
     exit()
 
+# Check that the IPs are multicast
+if ip_list.is_multicast: 
+    pass
+else:
+    print(f'[*] IPs provided are not multicase. Please try again.')
+    sys.exit()
+
 # Prepare the resulting playlist file
 # ===================================
 # define the current directory

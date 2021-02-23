@@ -234,6 +234,13 @@ except:
     print(f'\n[*] Please define a proper IP range.\n[*] >>> Example: 224.0.0.0/24\n')
     exit()
 
+# Check that the IPs are multicast
+if ip_list.is_multicast: 
+    pass
+else:
+    print(f'[*] IPs provided are not multicase. Please try again.')
+    sys.exit()
+
 # Prepare the resulting playlist file
 # ===================================
 # define the current directory
@@ -286,7 +293,7 @@ try:
     if args.smtp_server and args.smtp_port and args.sender and args.receivers:
         send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, playlistFile, playlistFileName)
 
-    exit()
+    sys.exit()
 
 except KeyboardInterrupt:
     print('\n[*] Script has been closed!')
