@@ -74,8 +74,6 @@ def channel_checker(channel_address, channel_port, nic_ip):
     ready = select.select([sock], [], [], 5)
 
     if ready[0]:
-        # Get the 1024 bytes of IPTV channel data
-        data = sock.recv(1024)
         return 0
     else:
         return 1
