@@ -30,6 +30,7 @@ parser.add_argument("--nic",            help="network interface IP address with 
 parser.add_argument("--timeout",        help="Time to wait in seconds for the UPD stream",      required=False, default=5)
 parser.add_argument("--port",           help="addtional UDP port to scan. Default: 1234",       required=False, default=['1234'], nargs='+')
 parser.add_argument("--range",          help="Range of IPs to scan. Default: 233.252.0.0/14",   required=False, default='233.252.0.0/14')
+parser.add_argument("--size",           help="Size of the subnets to divide. Default: 24",      required=False, default=24)
 parser.add_argument("--smtp_server",    help="SMTP server to send an email",                    required=False)
 parser.add_argument("--smtp_port",      help="Port for SMTP server",                            required=False, default=25)
 parser.add_argument("--sender",         help="email address for email sender",                  required=False)
@@ -241,53 +242,66 @@ else:
     print(f'[*] IPs provided are not multicase. Please try again.')
     sys.exit()
 
-# Prepare the resulting playlist file
-# ===================================
-# define the current directory
-currentPath = os.path.dirname(os.path.realpath(__file__))
+# # Prepare the resulting playlist file
+# # ===================================
+# # define the current directory
+# currentPath = os.path.dirname(os.path.realpath(__file__))
 
-# Define the playlist file name
-playlistFileName = f'scan_results_range_{args.range.split("/")[0]}-{args.range.split("/")[1]}.m3u'
-playlistFile = os.path.join(currentPath, playlistFileName)
+# # Define the playlist file name
+# playlistFileName = f'scan_results_range_{args.range.split("/")[0]}-{args.range.split("/")[1]}.m3u'
+# playlistFile = os.path.join(currentPath, playlistFileName)
 
-# Open the playlist file and add the first line (header)
-with open(playlistFile, 'w') as file:
-    file.write(f'#EXTM3U\n')
+# # Open the playlist file and add the first line (header)
+# with open(playlistFile, 'w') as file:
+#     file.write(f'#EXTM3U\n')
 
-print(f'[*] Resulting file: {playlistFile}')
-# ===================================
+# print(f'[*] Resulting file: {playlistFile}')
+# # ===================================
 
-# Calculating totals
-print(f'[*] Calculating totals, please wait...')
-total_IPs = len(list(ip_list))
+
+# Devide the given IPs to the /24 subnets
+try:
+    subnets = ip_list.subnets(new_prefix=int(args.size))
+    subnets = list(subnets)
+except:
+    print(f'[*] ERROR: the new prefix --size: "{args.size}" must be longer than the given IPs subnet: "/{ip_list.prefixlen}"\n')
+    sys.exit()
+
+# Calculating and printing the totals
+total_IPs = ip_list.num_addresses
 total_ports = len(port_list)
+
+print(f'\n[*] IP range to scan: {args.range}')
+print(f'[*] IPs to scan: {total_IPs:,}')
+print(f'[*] Ports to scan for each IP: {total_ports}') 
+print(f"[*] List of the port(s) to scan: {', '.join(port_list)}")
+print(f'[*] Timeout for UDP stream reply: {args.timeout} sec(s)')
+print(f'\n[*] Totals:')
+print(f'[*] Total items to scan: {total_IPs*total_ports:,}')
+print(f'[*] Total number of /{args.size} subnets to scan (# of threads): {len(subnets)}')
+print(f'[*] Total number of hosts for each subnet to scan: {int(total_IPs/len(subnets))} \n')
+
+# Scanning time estimation:
+time_to_complete = int((total_IPs/len(subnets))*total_ports*int(args.timeout))
+
+print(f'[*] Estimated maximum time to complete the task: {time_to_complete:,} seconds')
+
+# Scanning time estimation. Human readable
+day = time_to_complete // (24 * 3600)
+time_to_complete = time_to_complete % (24 * 3600)
+hour = time_to_complete // 3600
+time_to_complete %= 3600
+minutes = time_to_complete // 60
+time_to_complete %= 60
+seconds = time_to_complete
+
+print(f'[*] {day} day(s) {hour} hour(s) {minutes} minute(s) {seconds} second(s)\n')
 
 # Scan the IPs range with the given ports:
 try:
-    print(f'\n[*] IP range to scan: {args.range}')
-    print(f'[*] Total IPs to scan: {"{:,}".format(total_IPs)}')
-    print(f'[*] Total ports to scan for each IP: {total_ports}') 
-    print(f"[*] List of the port(s) to scan: {', '.join(port_list)}")
-    print(f'[*] Timeout for UDP stream reply: {args.timeout} sec(s)')
-    print(f'\n[*] Total items to scan: {"{:,}".format(total_IPs*total_ports)}\n')
-
-    # Scanning time estimation:
-    time_to_complete = int(total_IPs*total_ports*int(args.timeout))
-    print(f'[*] Estimated maximum time to complete the task: {"{:,}".format(time_to_complete)} seconds')
-    
-    # Scanning time estimation. Human readable
-    day = time_to_complete // (24 * 3600)
-    time_to_complete = time_to_complete % (24 * 3600)
-    hour = time_to_complete // 3600
-    time_to_complete %= 3600
-    minutes = time_to_complete // 60
-    time_to_complete %= 60
-    seconds = time_to_complete
-    print(f'[*] {day} day(s) {hour} hour(s) {minutes} minute(s) {seconds} second(s)\n\n')
-    print(f'[*] The scanning is about to start. Please wait ...\n')
 
     # Run the scanner
-    ip_scanner(ip_list, port_list)
+    #ip_scanner(ip_list, port_list)
 
     # Send an email with the resulting file
     if args.smtp_server and args.smtp_port and args.sender and args.receivers:
