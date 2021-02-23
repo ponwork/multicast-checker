@@ -4,6 +4,11 @@
 # Additional UDP ports can be defined via --port argument(s). Example below:
 # --port 5500 5555
 # Please read the manual (run the script with -h parameter) for more info
+#
+# Data used:
+# - https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
+# - https://www.davidc.net/sites/default/subnets/subnets.html
+# - https://www.youtube.com/watch?v=IEEhzQoKtQU
 
 import argparse
 import socket
@@ -24,7 +29,7 @@ parser.add_argument("--playlist",       help="Playlist *.m3u file with UDP strea
 parser.add_argument("--nic",            help="network interface IP address with UDP stream",    required=False, default='')
 parser.add_argument("--timeout",        help="Time to wait in seconds for the UPD stream",      required=False, default=5)
 parser.add_argument("--port",           help="addtional UDP port to scan. Default: 1234",       required=False, default=['1234'], nargs='+')
-parser.add_argument("--range",          help="Range of IPs to scan. Default: 224.0.0.0/24",     required=False, default='224.0.0.0/24')
+parser.add_argument("--range",          help="Range of IPs to scan. Default: 233.252.0.0/14",   required=False, default='233.252.0.0/14')
 parser.add_argument("--smtp_server",    help="SMTP server to send an email",                    required=False)
 parser.add_argument("--smtp_port",      help="Port for SMTP server",                            required=False, default=25)
 parser.add_argument("--sender",         help="email address for email sender",                  required=False)
