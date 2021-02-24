@@ -8,9 +8,9 @@
 # Data used:
 # - https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
 # - https://www.davidc.net/sites/default/subnets/subnets.html
-# - https://www.youtube.com/watch?v=IEEhzQoKtQU
 
 import concurrent.futures
+import time
 import argparse
 import socket
 import struct
@@ -26,12 +26,12 @@ from email.mime.multipart import MIMEMultipart
 # Setup the command line argument parsing
 parser = argparse.ArgumentParser(description='Script to check the IPTV UDP streams from m3u playlist')
 
+parser.add_argument("--range",          help="Range of IPs to scan.",                           required=True)
+parser.add_argument("--size",           help="Size of the subnets to divide.",                  required=True)
 parser.add_argument("--playlist",       help="Playlist *.m3u file with UDP streams",            required=False)
-parser.add_argument("--nic",            help="network interface IP address with UDP stream",    required=False, default='')
+parser.add_argument("--nic",            help="network interface IP address with UDP stream",    required=False, default='0.0.0.0')
 parser.add_argument("--timeout",        help="Time to wait in seconds for the UPD stream",      required=False, default=5)
 parser.add_argument("--port",           help="addtional UDP port to scan. Default: 1234",       required=False, default=['1234'], nargs='+')
-parser.add_argument("--range",          help="Range of IPs to scan.",                           required=True)
-parser.add_argument("--size",           help="Size of the subnets to divide.",                  required=False, default=30)
 parser.add_argument("--smtp_server",    help="SMTP server to send an email",                    required=False)
 parser.add_argument("--smtp_port",      help="Port for SMTP server",                            required=False, default=25)
 parser.add_argument("--sender",         help="email address for email sender",                  required=False)
@@ -43,29 +43,29 @@ channels_dictionary = []
 # Define functions
 # ================
 
-# def playlist_add(ip, port, id):
-#     """ Add the given IP and port to the playlist file"""
+def playlist_add(ip, port, id):
+    """ Add the given IP and port to the playlist file"""
     
-#     # Define the full name/path to the playlist file
-#     global playlistFile
+    # Define the full name/path to the playlist file
+    global playlistFile
 
-#     # Open the file
-#     with open(playlistFile, 'a') as file:
+    # Open the file
+    with open(playlistFile, 'a') as file:
 
-#         # Add the channel name line
-#         file.write(f'#EXTINF:2,Channel #{id}\n')
+        # Add the channel name line
+        file.write(f'#EXTINF:2,Channel #{id} Address: {ip}:{port}\n')
 
-#         #Add the channel address
-#         file.write(f'udp://@{ip}:{port}\n')
+        #Add the channel address
+        file.write(f'udp://@{ip}:{port}\n')
 
-#     print(f'[*] !!! Channel added to the playlist !!!\n')
+    print(f'[*] !!! Channel added to the playlist !!!')
 
-#     return 0
+    return 0
 
 def ip_scanner(ip_list, port_list):
     """ Scan the given lists of IPs and ports """
 
-    print(f'[*] Scanning for {ip_list} started!')
+    print(f'[*] >>> Scanning for {ip_list} started!')
 
     # Define the given dictionary
     global channels_dictionary
@@ -73,63 +73,65 @@ def ip_scanner(ip_list, port_list):
     counter = 0
     for ip in ip_list:
         for port in port_list:
-            result = channel_checker(str(ip), port, args.nic)
+            sock = socket_creator(args.nic, str(ip), port)
+            result = channel_checker(sock)
             if result == 0:
-                print(f'\n[*] !!! Channel found !!! {str(ip)}:{port}')
+                print(f'[*] !!! Channel found !!! {str(ip)}:{port}')
                 if args.playlist:
                     if f'{str(ip)}:{port}' not in list(channels_dictionary.values()):
                         counter += 1
                         playlist_add(ip, port, counter)
                     else:
-                        print(f'[*] The channel is already in the playlist\n')
+                        print(f'[*] The channel is already in the playlist')
                 else:
                     counter += 1
-                    #playlist_add(ip, port, counter)
+                    playlist_add(ip, port, counter)
             else:
                 print(f'[*] No stream found for: {str(ip)}:{port}')
     
-    return f'[*] Scanning for {ip_list} completed!'
+    return f'[*] <<< Scanning for {ip_list} completed!'
 
-def channel_checker(channel_address, channel_port, nic):
-    """ Function to check the given UDP stream """
+def channel_checker(sock):
+    """ Function to check the given UDP socket """
 
-    # Creating the socket
+    global args
+
+    ready = select.select([sock], [], [], args.timeout)
+    if ready[0]:
+        sock.close()
+        return 0
+    else:
+        return 1
+
+
+def socket_creator(nic, address, port):
+    """ Creates a sockets for a given ports """
+
+    # Create a UDP socket
     # AF_INET address family represented by a pair (host, port)
     # SOCK_DGRAM is a UDP socket type for datagram-based protocol
     # IPPROTO_UDP to set a UDP protocol type
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-
-    # Configuring the socket
+    
+    # Allow multiple sockets to use the same PORT number
     # socket.setsockopt(level, optname, value: int)
     #
     # SOL_SOCKET is the socket layer/level itself
-    # SO_REUSEADDR socket option tells the kernel that even if this port is busy
+    # SO_REUSEPORT socket option tells the kernel that even if this port is busy
     # 1 representing a buffer
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    
+    # Bind to the port that we know will receive multicast data
+    sock.bind((nic, int(port)))
+    
+    # Tell the kernel that we are a multicast socket
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
+    
+    # Tell the kernel that we want to add ourselves to a multicast group
+    # The address for the multicast group is the third param
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(address) + socket.inet_aton(nic))
 
-    # Apply non-blocking mode
-    sock.setblocking(False)
-
-    sock.bind((nic, int(channel_port)))
-
-    # Pack and format the socket data as following:
-    # '4sl' format: 4 - nember of bytes, s - char[] to bytes, l - long to integer
-    # inet_aton: Convert an IPv4 address from to 32-bit packed binary format
-    # INADDR_ANY used to bind to all interfaces
-    mreq = struct.pack('4sl', socket.inet_aton(channel_address), socket.INADDR_ANY)
-
-    # REconfigure the socket
-    # IPPROTO_IP: apply IP protocol type
-    # IP_ADD_MEMBERSHIP: recall that you need to tell the kernel which multicast groups you are interested in
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-    # Check that socket is ready with 10 sec timeout
-    ready = select.select([sock], [], [], 5)
-
-    if ready[0]:
-        return 0
-    else:
-        return 1
+    return sock
 
 def playlist_parser(playlist):
     """ Function that returns a dictionary of UDP streams"""
@@ -230,6 +232,7 @@ if args.port:
     port_list = port_list + args.port
     port_list = set(port_list)
 
+
 # Get the list of IPs to scan
 try:
     ip_list = ipaddress.IPv4Network(args.range)
@@ -247,21 +250,21 @@ else:
 # # Prepare the resulting playlist file
 # # ===================================
 # # define the current directory
-# currentPath = os.path.dirname(os.path.realpath(__file__))
+currentPath = os.path.dirname(os.path.realpath(__file__))
 
-# # Define the playlist file name
-# playlistFileName = f'scan_results_range_{args.range.split("/")[0]}-{args.range.split("/")[1]}.m3u'
-# playlistFile = os.path.join(currentPath, playlistFileName)
+# Define the playlist file name
+playlistFileName = f'scan_results_range_{args.range.split("/")[0]}-{args.range.split("/")[1]}.m3u'
+playlistFile = os.path.join(currentPath, playlistFileName)
 
-# # Open the playlist file and add the first line (header)
-# with open(playlistFile, 'w') as file:
-#     file.write(f'#EXTM3U\n')
+# Open the playlist file and add the first line (header)
+with open(playlistFile, 'w') as file:
+    file.write(f'#EXTM3U\n')
 
-# print(f'[*] Resulting file: {playlistFile}')
+print(f'[*] Resulting file: {playlistFile}')
 # # ===================================
 
 
-# Devide the given IPs to the /24 subnets
+# Devide the given IPs to the subnets
 try:
     subnets = ip_list.subnets(new_prefix=int(args.size))
     subnets = list(subnets)
@@ -302,26 +305,26 @@ print(f'[*] {day} day(s) {hour} hour(s) {minutes} minute(s) {seconds} second(s)\
 # Scan the IPs range with the given ports:
 try:
 
-    # Conver subnets list of IPv4Network objects to the list of strings
-    # subnets_list = []
-    # for subnet in subnets:
-    #     subnets_list.append(format(subnet))
+    # Start timer:
+    start = time.perf_counter()
 
-    # print(f'{subnets_list}')
+    # Run the scanner as a multi-thread executor
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(subnets)) as executor:
+        results = [executor.submit(ip_scanner, subnet, port_list) for subnet in subnets]
 
-    # Run the scanner
-    # with concurrent.futures.ThreadPoolExecutor() as executor:
-    #     results = [executor.submit(ip_scanner, subnet, port_list) for subnet in subnets]
-
-    #     # Print the result:
-    #     for item in concurrent.futures.as_completed(results):
-    #         print(item.result())
-
-    ip_scanner(ip_list, port_list)
+        # Print the result:
+        for item in concurrent.futures.as_completed(results):
+            print(item.result())
 
     # Send an email with the resulting file
     if args.smtp_server and args.smtp_port and args.sender and args.receivers:
         send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, playlistFile, playlistFileName)
+
+    # Stop timer
+    finish = time.perf_counter()
+
+    # Print the execution time:
+    print(f'\n\nFinished in {round(finish - start, 2)} second(s)\n')
 
     sys.exit()
 
