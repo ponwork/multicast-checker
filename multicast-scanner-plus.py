@@ -16,6 +16,8 @@ import socket
 import struct
 import select
 import os
+import subprocess
+import json
 import re
 import sys
 import ipaddress
@@ -30,35 +32,134 @@ parser.add_argument("--range",          help="Range of IPs to scan.",           
 parser.add_argument("--size",           help="Size of the subnets to divide.",                  required=True)
 parser.add_argument("--playlist",       help="Playlist *.m3u file with UDP streams",            required=False)
 parser.add_argument("--nic",            help="network interface IP address with UDP stream",    required=False, default='0.0.0.0')
-parser.add_argument("--timeout",        help="Time to wait in seconds for the UPD stream",      required=False, default=5)
+parser.add_argument("--udp_timeout",    help="Time to wait in seconds for the UPD port reply",  required=False, default=5)
 parser.add_argument("--port",           help="addtional UDP port to scan. Default: 1234",       required=False, default=['1234'], nargs='+')
+parser.add_argument("--sample_sec",     help="Sample lenght in seconds",                        required=False, default=10)
+parser.add_argument("--info_timeout",   help="Time to wait in seconds for the stream's info",   required=False, default=10)
 parser.add_argument("--smtp_server",    help="SMTP server to send an email",                    required=False)
 parser.add_argument("--smtp_port",      help="Port for SMTP server",                            required=False, default=25)
 parser.add_argument("--sender",         help="email address for email sender",                  required=False)
 parser.add_argument("--receivers",      help="emails of the receivers (space separated)",       required=False, nargs='+')
 
-# Define the variable for the dictionary
+# Define the variable for the channels dictionary
 channels_dictionary = []
+
+# Define the variable for the list of the channels without names 
+unnamed_channels_dictionary = []
 
 # Define functions
 # ================
 
-def playlist_add(ip, port, id):
+def seconds_humanize(input_seconds):
+    """ Convert seconds to Human readable format"""
+
+    days = input_seconds // (24 * 3600)
+    input_seconds = input_seconds % (24 * 3600)
+    hours = input_seconds // 3600
+    input_seconds %= 3600
+    minutes = input_seconds // 60
+    input_seconds %= 60
+    seconds = input_seconds
+
+    return days, hours, minutes, seconds
+
+def get_ffmpeg_sample(address, port):
+    """ To get the stream sample """
+
+    global args
+
+    try:
+        subprocess.run([f'ffmpeg -v quiet -y -i udp://@{address}:{port} -vcodec copy -acodec copy -t {args.sample_sec} sample_{address}-{port}.mp4'], \
+                        shell=True, stdin=None, stdout=None, stderr=None)
+    except:
+        print(f'[*] !!! Error with saving the file: sample_{address}-{port}.mp4 !!!')
+        sys.exit()   
+
+def get_ffprobe(address, port):
+    """ To get the json data from ip:port """
+
+    global args
+
+    # Run the ffprobe with given IP and PORT with a given timeout to execute
+    try:
+        
+        # Capture the output from ffprobe
+        result = subprocess.run(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_programs', f'udp://@{address}:{port}'], capture_output=True, text=True, timeout=args.info_timeout)
+        
+        # Convert the STDOUT to JSON
+        json_string = json.loads(str(result.stdout))
+    
+    except:
+        print(f'[*] No data found for {address}:{port}')
+        return 0
+    
+    # Parse the JSON "PROGRAMS" section
+    for program in json_string['programs']:
+        
+        # Parse the JSON "STEAMS" section
+        for stream in program['streams']:
+
+            # Check the stream via codec_type data
+            try:
+                
+                stream['codec_type'] != ''
+                
+                # Check the stream's channel name
+                try:
+
+                    program['tags']['service_name'] != ''
+                    return program['tags']['service_name']
+                
+                except:
+                    
+                    print(f'[*] !!! No channel name found for {address}:{port} !!!')
+                    return 1
+            
+            except:
+                
+                print(f'[*] No stream found for {address}:{port}')
+                return 0
+
+def playlist_add(ip, port, name):
     """ Add the given IP and port to the playlist file"""
     
     # Define the full name/path to the playlist file
     global playlistFile
 
+    # Define the given dictionary
+    global channels_dictionary
+
+    # Check the name variable%
+    if type(name) is int:
+        channel_string = f'#EXTINF:2,Channel #{name} Address: {ip}:{port}\n'
+    else:
+        channel_string = f'#EXTINF:2,{name}\n'
+
+    
     # Open the file
     with open(playlistFile, 'a') as file:
+        
+        # Check if the playlist was provided:
+        if args.playlist:
+            if f'{str(ip)}:{port}' not in list(channels_dictionary.values()):
+                
+                # Add the channel name line
+                file.write(channel_string)
 
+                #Add the channel address
+                file.write(f'udp://@{ip}:{port}\n')    
+                            
+            else:
+                print(f'[*] The channel is already in the playlist: {ip}:{port} >>> {name}')
+        
         # Add the channel name line
-        file.write(f'#EXTINF:2,Channel #{id} Address: {ip}:{port}\n')
+        file.write(channel_string)
 
         #Add the channel address
         file.write(f'udp://@{ip}:{port}\n')
 
-    print(f'[*] !!! Channel added to the playlist !!!')
+
+    print(f'[*] !!! Channel added to the playlist. {ip}:{port} >>> {name} !!!')
 
     return 0
 
@@ -67,27 +168,29 @@ def ip_scanner(ip_list, port_list):
 
     print(f'[*] >>> Scanning for {ip_list} started!')
 
-    # Define the given dictionary
-    global channels_dictionary
-
     counter = 0
     for ip in ip_list:
         for port in port_list:
             sock = socket_creator(args.nic, str(ip), port)
             result = channel_checker(sock)
             if result == 0:
-                print(f'[*] !!! Channel found !!! {str(ip)}:{port}')
-                if args.playlist:
-                    if f'{str(ip)}:{port}' not in list(channels_dictionary.values()):
-                        counter += 1
-                        playlist_add(ip, port, counter)
-                    else:
-                        print(f'[*] The channel is already in the playlist')
-                else:
+                
+                print(f'[*] !!! Found opened port {port} for {str(ip)}')
+                
+                # Get the data of the possible stream
+                info = get_ffprobe(ip, port)
+
+                if info == 1: # Stream captured but without channel name
                     counter += 1
                     playlist_add(ip, port, counter)
-            else:
-                print(f'[*] No stream found for: {str(ip)}:{port}')
+                    unnamed_channels_dictionary.append(f'{ip}:{port}')
+
+                elif info != 0: # Stream captured with channel name
+                    counter += 1
+                    playlist_add(ip, port, info)
+
+            # else:
+            #     print(f'[*] No stream found for: {str(ip)}:{port}')
     
     return f'[*] <<< Scanning for {ip_list} completed!'
 
@@ -96,7 +199,7 @@ def channel_checker(sock):
 
     global args
 
-    ready = select.select([sock], [], [], args.timeout)
+    ready = select.select([sock], [], [], args.udp_timeout)
     if ready[0]:
         sock.close()
         return 0
@@ -119,7 +222,9 @@ def socket_creator(nic, address, port):
     # SOL_SOCKET is the socket layer/level itself
     # SO_REUSEPORT socket option tells the kernel that even if this port is busy
     # 1 representing a buffer
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+
+    # socket.SO_REUSEPORT -- for MacOS
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
     # Bind to the port that we know will receive multicast data
     sock.bind((nic, int(port)))
@@ -213,6 +318,7 @@ port_list = {}
 
 # Check the data of the playlist file
 if args.playlist:
+
     # Check the input playlist file
     if not os.path.isfile(args.playlist):
         print(f'[*] Please specify the correct file!')
@@ -280,27 +386,30 @@ print(f'\n[*] IP range to scan: {args.range}')
 print(f'[*] IPs to scan: {total_IPs:,}')
 print(f'[*] Ports to scan for each IP: {total_ports}') 
 print(f"[*] List of the port(s) to scan: {', '.join(port_list)}")
-print(f'[*] Timeout for UDP stream reply: {args.timeout} sec(s)')
+print(f'[*] Timeout for UDP stream reply: {args.udp_timeout} sec(s)')
+print(f'[*] Timeout for stream data collection: {args.info_timeout} sec(s)')
+print(f'[*] Sample lenght in seconds: {args.sample_sec} sec(s)')
 print(f'\n[*] Totals:')
 print(f'[*] Total items to scan: {total_IPs*total_ports:,}')
 print(f'[*] Total number of /{args.size} subnets to scan (# of threads): {len(subnets)}')
 print(f'[*] Total number of hosts for each subnet to scan: {int(total_IPs/len(subnets))} \n')
 
 # Scanning time estimation:
-time_to_complete = int((total_IPs/len(subnets))*total_ports*int(args.timeout))
+time_to_complete = int((total_IPs/len(subnets))*total_ports*int(args.udp_timeout)*int(args.info_timeout))
 
 print(f'[*] Estimated maximum time to complete the task: {time_to_complete:,} seconds')
 
-# Scanning time estimation. Human readable
-day = time_to_complete // (24 * 3600)
-time_to_complete = time_to_complete % (24 * 3600)
-hour = time_to_complete // 3600
-time_to_complete %= 3600
-minutes = time_to_complete // 60
-time_to_complete %= 60
-seconds = time_to_complete
+# Conver to humain readable
+days, hours, minutes, seconds = seconds_humanize(time_to_complete)
+print(f'[*] {days} day(s) {hours} hour(s) {minutes} minute(s) {seconds} second(s)\n')
 
-print(f'[*] {day} day(s) {hour} hour(s) {minutes} minute(s) {seconds} second(s)\n')
+# Check that FFmpeg/FFprobe are installed
+try:
+    subprocess.call(['ffprobe', '-v', 'quiet'])
+    subprocess.call(['ffmpeg', '-v', 'quiet'])
+except FileNotFoundError:
+    print('[*] ffmpeg and ffprobe are not installed! Please install first: https://ffmpeg.org/')
+    sys.exit()
 
 # Scan the IPs range with the given ports:
 try:
@@ -316,6 +425,13 @@ try:
         for item in concurrent.futures.as_completed(results):
             print(item.result())
 
+    # Record the samples of the unnamed channels
+    print(f'\n[*] Recording the samples for unnamed channels...')
+    for channel in unnamed_channels_dictionary:
+        address, port = channel.split(':')
+        get_ffmpeg_sample(address, port)
+        print(f'[*] !!! Sample for {address}:{port} captured !!!')
+
     # Send an email with the resulting file
     if args.smtp_server and args.smtp_port and args.sender and args.receivers:
         send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, playlistFile, playlistFileName)
@@ -324,7 +440,12 @@ try:
     finish = time.perf_counter()
 
     # Print the execution time:
-    print(f'\n\nFinished in {round(finish - start, 2)} second(s)\n')
+    total_time = round(finish - start, 0)
+    print(f'\n\n[*] Finished in {total_time:,} second(s)\n')
+
+    # Conver to humain readable
+    days, hours, minutes, seconds = seconds_humanize(total_time)
+    print(f'[*] {days} day(s) {hours} hour(s) {minutes} minute(s) {seconds} second(s)\n')
 
     sys.exit()
 
