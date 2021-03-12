@@ -1,6 +1,7 @@
-# The script will scan the UDP IPs range (Default: 224.0.0.0/8).
-# If the --playlst parameter defined the script will use all the unique ports for the scan
-# Default port to scan (1234)
+# The script will scan the UDP IPs range for the given ports (default '1234').
+# As a result the resulting m3u file will be created.
+#
+# If the --playlst parameter with the existing m3u file is defined the script will use all the unique ports from it
 # Additional UDP ports can be defined via --port argument(s). Example below:
 # --port 5500 5555
 # Please read the manual (run the script with -h parameter) for more info
@@ -16,6 +17,7 @@ import socket
 import struct
 import select
 import os
+import platform
 import subprocess
 import json
 import re
@@ -47,6 +49,7 @@ channels_dictionary = []
 # Define the variable for the list of the channels without names 
 unnamed_channels_dictionary = []
 
+# ================
 # Define functions
 # ================
 
@@ -107,8 +110,11 @@ def get_ffprobe(address, port):
                 # Check the stream's channel name
                 try:
 
-                    program['tags']['service_name'] != ''
-                    return program['tags']['service_name']
+                    if program['tags']['service_name'] != '':
+                        return program['tags']['service_name']
+                    else:
+                        print(f'[*] !!! No channel name found for {address}:{port} !!!')
+                        return 1
                 
                 except:
                     
@@ -120,9 +126,25 @@ def get_ffprobe(address, port):
                 print(f'[*] No stream found for {address}:{port}')
                 return 0
 
+def create_file(range):
+    """ Prepare the resulting playlist file """
+
+    #define the current directory
+    currentPath = os.path.dirname(os.path.realpath(__file__))
+
+    # Define the playlist file name
+    playlistFileName = f'scan_results_range_{range.split("/")[0]}-{range.split("/")[1]}.m3u'
+    playlistFile = os.path.join(currentPath, playlistFileName)
+
+    # Open the playlist file and add the first line (header)
+    with open(playlistFile, 'w') as file:
+        file.write(f'#EXTM3U\n')
+
+    return playlistFile
+
 def playlist_add(ip, port, name):
     """ Add the given IP and port to the playlist file"""
-    
+
     # Define the full name/path to the playlist file
     global playlistFile
 
@@ -166,12 +188,10 @@ def playlist_add(ip, port, name):
 def ip_scanner(ip_list, port_list):
     """ Scan the given lists of IPs and ports """
 
-    print(f'[*] >>> Scanning for {ip_list} started!')
-
     counter = 0
     for ip in ip_list:
         for port in port_list:
-            sock = socket_creator(args.nic, str(ip), port)
+            sock = socket_creator(args.nic, str(ip), port, os_name)
             result = channel_checker(sock)
             if result == 0:
                 
@@ -192,7 +212,7 @@ def ip_scanner(ip_list, port_list):
             # else:
             #     print(f'[*] No stream found for: {str(ip)}:{port}')
     
-    return f'[*] <<< Scanning for {ip_list} completed!'
+    return f'[*] Scanning for {ip_list} completed!'
 
 def channel_checker(sock):
     """ Function to check the given UDP socket """
@@ -206,8 +226,7 @@ def channel_checker(sock):
     else:
         return 1
 
-
-def socket_creator(nic, address, port):
+def socket_creator(nic, address, port, os_name):
     """ Creates a sockets for a given ports """
 
     # Create a UDP socket
@@ -220,11 +239,15 @@ def socket_creator(nic, address, port):
     # socket.setsockopt(level, optname, value: int)
     #
     # SOL_SOCKET is the socket layer/level itself
-    # SO_REUSEPORT socket option tells the kernel that even if this port is busy
+    # SO_REUSEPORT/SO_REUSEPORT socket option tells the kernel that even if this ip/port is busy
     # 1 representing a buffer
+    #
+    # For MacOS ('Darwin') use a reusable port, else -- reusable ip
 
-    # socket.SO_REUSEPORT -- for MacOS
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if os_name == 'Darwin':
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    else:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     
     # Bind to the port that we know will receive multicast data
     sock.bind((nic, int(port)))
@@ -309,12 +332,19 @@ def send_email(smtp_server, smtp_port, sender, receivers, attachment, attachment
 
 # ================
 # End of functions
+# ================
 
 # Define the script arguments as a <args> variable
 args = parser.parse_args()
 
+# Check the OS name
+os_name = platform.system()
+
 # Define the dictionary for UDP ports:
 port_list = {}
+
+# Create a resulting playlist file:
+playlistFile = create_file(args.range)
 
 # Check the data of the playlist file
 if args.playlist:
@@ -352,23 +382,6 @@ if ip_list.is_multicast:
 else:
     print(f'[*] IPs provided are not multicase. Please try again.')
     sys.exit()
-
-# # Prepare the resulting playlist file
-# # ===================================
-# # define the current directory
-currentPath = os.path.dirname(os.path.realpath(__file__))
-
-# Define the playlist file name
-playlistFileName = f'scan_results_range_{args.range.split("/")[0]}-{args.range.split("/")[1]}.m3u'
-playlistFile = os.path.join(currentPath, playlistFileName)
-
-# Open the playlist file and add the first line (header)
-with open(playlistFile, 'w') as file:
-    file.write(f'#EXTM3U\n')
-
-print(f'[*] Resulting file: {playlistFile}')
-# # ===================================
-
 
 # Devide the given IPs to the subnets
 try:
@@ -426,11 +439,12 @@ try:
             print(item.result())
 
     # Record the samples of the unnamed channels
-    print(f'\n[*] Recording the samples for unnamed channels...')
-    for channel in unnamed_channels_dictionary:
-        address, port = channel.split(':')
-        get_ffmpeg_sample(address, port)
-        print(f'[*] !!! Sample for {address}:{port} captured !!!')
+    if unnamed_channels_dictionary:
+        print(f'\n[*] Recording the samples for unnamed channels...')
+        for channel in unnamed_channels_dictionary:
+            address, port = channel.split(':')
+            get_ffmpeg_sample(address, port)
+            print(f'[*] !!! Sample for {address}:{port} captured !!!')
 
     # Send an email with the resulting file
     if args.smtp_server and args.smtp_port and args.sender and args.receivers:
@@ -441,12 +455,22 @@ try:
 
     # Print the execution time:
     total_time = round(finish - start, 0)
-    print(f'\n\n[*] Finished in {total_time:,} second(s)\n')
+    print(f'\n\n[*] Finished in {total_time:,} second(s)')
 
     # Conver to humain readable
     days, hours, minutes, seconds = seconds_humanize(total_time)
     print(f'[*] {days} day(s) {hours} hour(s) {minutes} minute(s) {seconds} second(s)\n')
 
+    # Count the results
+    count_results = len(open(playlistFile).readlines())
+    
+    # Print the results:
+    if count_results < 3:
+        print(f'[*] No channels found\n')
+        os.remove(playlistFile)
+    else:
+        print(f'[*] Channels found: {int((count_results - 1)/2)}')
+        print(f'[*] Resulting file: {playlistFile}\n')
     sys.exit()
 
 except KeyboardInterrupt:
