@@ -36,7 +36,7 @@ parser.add_argument("--playlist",       help="Playlist *.m3u file with UDP strea
 parser.add_argument("--nic",            help="network interface IP address with UDP stream",    required=False, default='0.0.0.0')
 parser.add_argument("--udp_timeout",    help="Time to wait in seconds for the UPD port reply",  required=False, default=5)
 parser.add_argument("--port",           help="addtional UDP port to scan. Default: 1234",       required=False, default=['1234'], nargs='+')
-parser.add_argument("--sample_sec",     help="Sample lenght in seconds",                        required=False, default=10)
+parser.add_argument("--sample_sec",     help="Sample lenght in seconds",                        required=False, default=60)
 parser.add_argument("--info_timeout",   help="Time to wait in seconds for the stream's info",   required=False, default=10)
 parser.add_argument("--smtp_server",    help="SMTP server to send an email",                    required=False)
 parser.add_argument("--smtp_port",      help="Port for SMTP server",                            required=False, default=25)
