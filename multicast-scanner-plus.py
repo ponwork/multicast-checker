@@ -1,14 +1,7 @@
-# The script will scan the UDP IPs range for the given ports (default '1234').
-# As a result the resulting m3u file will be created.
-#
-# If the --playlst parameter with the existing m3u file is defined the script will use all the unique ports from it
-# Additional UDP ports can be defined via --port argument(s). Example below:
-# --port 5500 5555
-# Please read the manual (run the script with -h parameter) for more info
-#
-# Data used:
-# - https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
-# - https://www.davidc.net/sites/default/subnets/subnets.html
+# Script to scan UPD addresses to find the media streams
+# 
+# author: Yuri Ponomarev
+# Github: https://github.com/ponwork/
 
 import concurrent.futures
 import time
@@ -72,7 +65,7 @@ def get_ffmpeg_sample(address, port):
     global args
 
     try:
-        subprocess.run([f'ffmpeg -v quiet -y -i udp://@{address}:{port} -vcodec copy -acodec copy -t {args.sample_sec} sample_{address}-{port}.mp4'], \
+        subprocess.run([f'ffmpeg -v quiet -y -i udp://@{address}:{port} -t {args.sample_sec} sample_{address}-{port}.mp4'], \
                         shell=True, stdin=None, stdout=None, stderr=None)
     except:
         print(f'[*] !!! Error with saving the file: sample_{address}-{port}.mp4 !!!')
@@ -140,7 +133,7 @@ def create_file(range):
     with open(playlistFile, 'w') as file:
         file.write(f'#EXTM3U\n')
 
-    return playlistFile
+    return playlistFileName, playlistFile
 
 def playlist_add(ip, port, name):
     """ Add the given IP and port to the playlist file"""
@@ -153,7 +146,7 @@ def playlist_add(ip, port, name):
 
     # Check the name variable%
     if type(name) is int:
-        channel_string = f'#EXTINF:2,Channel #{name} Address: {ip}:{port}\n'
+        channel_string = f'#EXTINF:2,Channel: {ip}:{port}\n'
     else:
         channel_string = f'#EXTINF:2,{name}\n'
 
@@ -169,10 +162,15 @@ def playlist_add(ip, port, name):
                 file.write(channel_string)
 
                 #Add the channel address
-                file.write(f'udp://@{ip}:{port}\n')    
+                file.write(f'udp://@{ip}:{port}\n')
+
+                print(f'[*] !!! Channel added to the playlist. {ip}:{port} >>> {name} !!!')
+
+                return 0
                             
             else:
                 print(f'[*] The channel is already in the playlist: {ip}:{port} >>> {name}')
+                return 0
         
         # Add the channel name line
         file.write(channel_string)
@@ -188,25 +186,25 @@ def playlist_add(ip, port, name):
 def ip_scanner(ip_list, port_list):
     """ Scan the given lists of IPs and ports """
 
-    counter = 0
     for ip in ip_list:
         for port in port_list:
             sock = socket_creator(args.nic, str(ip), port, os_name)
             result = channel_checker(sock)
             if result == 0:
                 
-                print(f'[*] !!! Found opened port {port} for {str(ip)}')
+                print(f'[*] Found opened port {port} for {str(ip)}')
                 
                 # Get the data of the possible stream
                 info = get_ffprobe(ip, port)
 
                 if info == 1: # Stream captured but without channel name
-                    counter += 1
-                    playlist_add(ip, port, counter)
+                    
+                    playlist_add(ip, port, info)
                     unnamed_channels_dictionary.append(f'{ip}:{port}')
+                    
+                    return 0
 
                 elif info != 0: # Stream captured with channel name
-                    counter += 1
                     playlist_add(ip, port, info)
 
             # else:
@@ -326,9 +324,9 @@ def send_email(smtp_server, smtp_port, sender, receivers, attachment, attachment
     try:
         smtpObj = smtplib.SMTP(smtp_server, smtp_port)
         smtpObj.sendmail(sender, receivers, msg.as_string())
-        print(f'[*] An email has been sent')
-    except SMTPException:
-        print(f'[*] Error: unable to send an email')
+        print(f'[*] An email has been sent to {receivers}')
+    except SMTPException as error:
+        print(f'[*] Error: unable to send an email\n\n{error}\n')
 
 # ================
 # End of functions
@@ -344,7 +342,7 @@ os_name = platform.system()
 port_list = {}
 
 # Create a resulting playlist file:
-playlistFile = create_file(args.range)
+playlistFileName, playlistFile = create_file(args.range)
 
 # Check the data of the playlist file
 if args.playlist:
@@ -464,7 +462,7 @@ try:
     # Count the results
     count_results = len(open(playlistFile).readlines())
     
-    # Print the results:
+    # Print the results and remove empty files if no channels found:
     if count_results < 3:
         print(f'[*] No channels found\n')
         os.remove(playlistFile)
