@@ -38,6 +38,27 @@ udp://@233.99.65.5:1234
 The script will scan all the schannels in the playlist.m3u and return the results
 (the service_name metadata field from the UDP stream will be captured in advance)
 
+Output example:
+```
+[*] Email parameters are not defined.
+[*] Run the script with -h parameter for the details.
+
+[*] Channel Info channel #2 is not working
+[*] Channel Info channel #4 is not working
+[*] Channel Info channel #3 is not working
+[*] Channel Info channel #5 is not working
+[*] OK >>> Channel is working! >>> "Info channel #1" >>> No stream name found
+
+[*] The following channel(s) are not working:
+
+233.99.65.2:5500 - Info channel #2
+233.99.65.4:5500 - Info channel #4
+233.99.65.3:1234 - Info channel #3
+233.99.65.5:1234 - Info channel #5
+
+
+[*] Finished in 7.0 second(s)
+```
 
 ### **multicast-scanner.py**
 ```shell
