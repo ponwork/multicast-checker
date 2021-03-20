@@ -2,7 +2,7 @@
 # :rainbow::rainbow::rainbow: MULTICAST-CHECKER :rainbow::rainbow::rainbow:
 > Research project
 > 
-> YOUR USAGE OF THE APPLICATIONS IS AT YOUR OWN RISK
+> YOUR USAGE OF THE SCRIPTS IS AT YOUR OWN RISK
 
 ![MULTICAST-CHECKER logo](https://github.com/ponwork/multicast-checker/blob/main/logo.jpg)
 
