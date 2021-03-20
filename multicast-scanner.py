@@ -25,7 +25,7 @@ from email.mime.multipart import MIMEMultipart
 parser = argparse.ArgumentParser(description='Script to check the IPTV UDP streams from m3u playlist')
 
 parser.add_argument("--range",          help="Range of IPs to scan.",                           required=True)
-parser.add_argument("--size",           help="Size of the subnets to divide.",                  required=True)
+parser.add_argument("--size",           help="Size of the subnets to divide.",                  required=False, default='32')
 parser.add_argument("--playlist",       help="Playlist *.m3u file with UDP streams",            required=False)
 parser.add_argument("--nic",            help="network interface IP address with UDP stream",    required=False, default='0.0.0.0')
 parser.add_argument("--udp_timeout",    help="Time to wait in seconds for the UPD port reply",  required=False, default=5)
