@@ -1,10 +1,8 @@
 
-# MULTICAST-CHECKER
-> :rainbow::rainbow::rainbow: Research project
-
-> :rainbow::rainbow::rainbow: No Warranty
-
-> :rainbow::rainbow::rainbow: YOUR USAGE OF THE APPLICATIONS IS AT YOUR OWN RISK
+# :rainbow::rainbow::rainbow: MULTICAST-CHECKER :rainbow::rainbow::rainbow:
+> Research project
+> 
+> YOUR USAGE OF THE APPLICATIONS IS AT YOUR OWN RISK
 
 The project contains 2 scripts:
 
