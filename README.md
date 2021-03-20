@@ -118,7 +118,7 @@ Scripts were tested on Linux (Ubuntu 20.04) and MacOS (Big Sur, 11.2.2)
 
 You can find all the parameters of the scripts using the following:
 
-```shell
+```
 python3 multicast-checker.py -h
 
 --playlist         "Playlist *.m3u file with UDP streams"             required: True
@@ -131,8 +131,21 @@ python3 multicast-checker.py -h
 --receivers        "emails of the receivers (space separated)"        required: False
 ```
 
-```shell
+```
 python3 multicast-scanner.py -h
+
+--range            "Range of IPs to scan."                            required: True
+--size             "Size of the subnets to divide."                   required: False default: '32'
+--playlist         "Playlist *.m3u file with UDP streams"             required: False
+--nic              "network interface IP address with UDP stream"     required: False default: '0.0.0.0'
+--udp_timeout      "Time to wait in seconds for the UPD port reply"   required: False default: 5
+--port             "addtional UDP port to scan. Default: 1234"        required: False default: '1234'
+--sample_sec       "Sample lenght in seconds"                         required: False default: 60
+--info_timeout     "Time to wait in seconds for the stream's info"    required: False default: 10
+--smtp_server      "SMTP server to send an email"                     required: False
+--smtp_port        "Port for SMTP server"                             required: False default: 25
+--sender           "email address for email sender"                   required: False
+--receivers        "emails of the receivers (space separated)"        required: False
 ```
 
 ## Features
