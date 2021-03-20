@@ -121,14 +121,14 @@ You can find all the parameters of the scripts using the following:
 ```shell
 python3 multicast-checker.py -h
 
---playlist"        "Playlist *.m3u file with UDP streams"             required: True
---nic"             "network interface IP address with UDP stream"     required: False default: '0.0.0.0'
---udp_timeout"     "Time to wait in seconds for the UPD port reply"   required: False default: 5
---info_timeout"    "Time to wait in seconds for the stream's info"    required: False default: 10
---smtp_server"     "SMTP server to send an email"                     required: False
---smtp_port"       "Port for SMTP server"                             required: False default: 25
---sender"          "email address for email sender"                   required: False
---receivers"       "emails of the receivers (space separated)"        required: False
+--playlist         "Playlist *.m3u file with UDP streams"             required: True
+--nic              "network interface IP address with UDP stream"     required: False default: '0.0.0.0'
+--udp_timeout      "Time to wait in seconds for the UPD port reply"   required: False default: 5
+--info_timeout     "Time to wait in seconds for the stream's info"    required: False default: 10
+--smtp_server      "SMTP server to send an email"                     required: False
+--smtp_port        "Port for SMTP server"                             required: False default: 25
+--sender           "email address for email sender"                   required: False
+--receivers        "emails of the receivers (space separated)"        required: False
 ```
 
 ```shell
