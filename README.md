@@ -4,8 +4,8 @@
 
 The project contains 2 scripts:
 
-- **multicast-checker.py** : to check the status of the UDP channels in m3u playlist
-- **multicast-scanner.py** : to scan the UDP IP range and find the active streams
+- [**multicast-checker.py**](https://github.com/ponwork/multicast-checker/blob/main/multicast-checker.py) : to check the status of the UDP channels in m3u playlist
+- [**multicast-scanner.py**](https://github.com/ponwork/multicast-checker/blob/main/multicast-scanner.py) : to scan the UDP IP range and find the active streams
 
 ## Installing / Getting started
 
