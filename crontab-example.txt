@@ -1,1 +1,0 @@
-0 */6 * * * python3 multicast-checker.py --playlist playlist.m3u --nic 0.0.0.0 --smtp_server relay.mail.com --smtp_port 25 --sender sender@mail.com --receivers receiver-01@mail.com receiver.02@mail.com > iptv-check.log
