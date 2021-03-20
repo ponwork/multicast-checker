@@ -1,4 +1,5 @@
 # Script to scan UPD addresses to find the media streams
+# Please read the manual (run the script with -h parameter)
 # 
 # author: Yuri Ponomarev
 # Github: https://github.com/ponwork/
@@ -95,10 +96,10 @@ def get_ffprobe(address, port):
         # Parse the JSON "STEAMS" section
         for stream in program['streams']:
 
-            # Check the stream via codec_type data
+            # Check the stream via index data
             try:
                 
-                stream['codec_type'] != ''
+                stream['index'] != ''
                 
                 # Check the stream's channel name
                 try:
@@ -197,18 +198,17 @@ def ip_scanner(ip_list, port_list):
                 # Get the data of the possible stream
                 info = get_ffprobe(ip, port)
 
-                if info == 1: # Stream captured but without channel name
+                if info == 0: # No metadata found for the stream
                     
+                    pass
+
+                elif info == 1: # Stream captured but without channel name
+
                     playlist_add(ip, port, info)
                     unnamed_channels_dictionary.append(f'{ip}:{port}')
-                    
-                    return 0
 
-                elif info != 0: # Stream captured with channel name
+                else: # Stream captured with the channel name
                     playlist_add(ip, port, info)
-
-            # else:
-            #     print(f'[*] No stream found for: {str(ip)}:{port}')
     
     return f'[*] Scanning for {ip_list} completed!'
 

@@ -1,30 +1,84 @@
 # Script will parse the input *.m3u playlist file and check all the channels inside.
-# In case if the channel is not working (no data eceived) and email can be send.
 # Please read the manual (run the script with -h parameter)
+# 
+# author: Yuri Ponomarev
+# Github: https://github.com/ponwork/
 
+import concurrent.futures
 import argparse
+import time
 import socket
 import struct
 import select
-import smtplib
+import json
 import re
 import os
+import platform
+import subprocess
 import sys
+import smtplib
 from email.mime.text import MIMEText
 
 # Setup the command line argument parsing
 parser = argparse.ArgumentParser(description='Script to check the IPTV UDP streams from m3u playlist')
 
 parser.add_argument("--playlist",       help="Playlist *.m3u file with UDP streams",            required=True)
+parser.add_argument("--nic",            help="network interface IP address with UDP stream",    required=False, default='0.0.0.0')
+parser.add_argument("--udp_timeout",    help="Time to wait in seconds for the UPD port reply",  required=False, default=5)
+parser.add_argument("--info_timeout",   help="Time to wait in seconds for the stream's info",   required=False, default=10)
 parser.add_argument("--smtp_server",    help="SMTP server to send an email",                    required=False)
 parser.add_argument("--smtp_port",      help="Port for SMTP server",                            required=False, default=25)
-parser.add_argument("--timeout",        help="Time to wait in seconds for the UPD stream",      required=False, default=5)
 parser.add_argument("--sender",         help="email address for email sender",                  required=False)
 parser.add_argument("--receivers",      help="emails of the receivers (space separated)",       required=False, nargs='+')
-parser.add_argument("--nic_ip",         help="network interface IP address with UDP stream",    required=False, default='')
 
+# ================
 # Define functions
 # ================
+
+def get_ffprobe(address, port):
+    """ To get the json data from ip:port """
+
+    global args
+
+    # Run the ffprobe with given IP and PORT with a given timeout to execute
+    try:
+        
+        # Capture the output from ffprobe
+        result = subprocess.run(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_programs', f'udp://@{address}:{port}'], capture_output=True, text=True, timeout=args.info_timeout)
+        
+        # Convert the STDOUT to JSON
+        json_string = json.loads(str(result.stdout))
+    
+    except:
+        print(f'[*] No data found for {address}:{port}')
+        return 0
+    
+    # Parse the JSON "PROGRAMS" section
+    for program in json_string['programs']:
+        
+        # Parse the JSON "STEAMS" section
+        for stream in program['streams']:
+
+            # Check the stream via index data
+            try:
+                
+                stream['index'] != ''
+                
+                # Check the stream's channel name
+                try:
+
+                    if program['tags']['service_name'] != '':
+                        return program['tags']['service_name']
+                    else:
+                        return 1
+                
+                except:
+                    return 1
+            
+            except:
+                
+                print(f'[*] No stream found for {address}:{port}')
+                return 0
 
 def playlist_parser(playlist):
     """ Function that returns a dictionary of UDP streams """
@@ -47,59 +101,95 @@ def playlist_parser(playlist):
                 channel_address = re.search(channel_address_re, playlist.readline()).group()
                 dictionary[channel_name] = channel_address
     
-    # Close the playlist file and return the dictionary with UDP streams
-    playlist.close()
-    
     return dictionary
 
-def channel_checker(channel_address, channel_port, nic_ip, timeout):
-    """ Function to check the given UDP stream """
+def channel_checker(sock):
+    """ Function to check the given UDP socket """
 
-    # Creating the socket
+    global args
+
+    ready = select.select([sock], [], [], args.udp_timeout)
+    if ready[0]:
+        sock.close()
+        return 0
+    else:
+        return 1
+
+def socket_creator(nic, address, port, os_name):
+    """ Creates a sockets for a given ports """
+
+    # Create a UDP socket
     # AF_INET address family represented by a pair (host, port)
     # SOCK_DGRAM is a UDP socket type for datagram-based protocol
     # IPPROTO_UDP to set a UDP protocol type
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-
-    # Configuring the socket
+    
+    # Allow multiple sockets to use the same PORT number
     # socket.setsockopt(level, optname, value: int)
     #
     # SOL_SOCKET is the socket layer/level itself
-    # SO_REUSEADDR socket option tells the kernel that even if this port is busy
+    # SO_REUSEPORT/SO_REUSEPORT socket option tells the kernel that even if this ip/port is busy
     # 1 representing a buffer
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    #
+    # For MacOS ('Darwin') use a reusable port, else -- reusable ip
 
-    sock.bind((nic_ip, int(channel_port)))
-
-    # Pack and format the socket data as following:
-    # '4sl' format: 4 - nember of bytes, s - char[] to bytes, l - long to integer
-    # inet_aton: Convert an IPv4 address from to 32-bit packed binary format
-    # INADDR_ANY used to bind to all interfaces
-    mreq = struct.pack('4sl', socket.inet_aton(channel_address), socket.INADDR_ANY)
-
-    # REconfigure the socket
-    # IPPROTO_IP: apply IP protocol type
-    # IP_ADD_MEMBERSHIP: recall that you need to tell the kernel which multicast groups you are interested in
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-    # Apply non-blocking mode
-    sock.setblocking(0)
-
-    # Check that socket is ready with the timeout
-    ready = select.select([sock], [], [], timeout)
-
-    if ready[0]:
-        # Get the 1024 bytes of IPTV channel data
-        data = sock.recv(1024)
-        return 0
+    if os_name == 'Darwin':
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
     else:
-        return 1
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    
+    # Bind to the port that we know will receive multicast data
+    sock.bind((nic, int(port)))
+    
+    # Tell the kernel that we are a multicast socket
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
+    
+    # Tell the kernel that we want to add ourselves to a multicast group
+    # The address for the multicast group is the third param
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(address) + socket.inet_aton(nic))
+
+    return sock
+
+def mass_checker(channel):
+    """ Function to mass check the channels in the dictionary """
+
+    # Define global variables
+    global os_name
+    global channels_not_working
+
+    # Check channel
+    channel_address, channel_port = channels_dictionary[channel].split(':')
+    sock = socket_creator(args.nic, channel_address, channel_port, os_name)
+    result = channel_checker(sock)
+    if result == 0:
+        
+        # Get the data of the possible stream
+        info = get_ffprobe(channel_address, channel_port)
+        
+        if info == 1: # Stream captured but without channel name
+                
+            return f'[*] OK >>> Channel is working! >>> "{channel}" >>> No stream name found'
+
+        elif info == 0:
+
+            # Add the broken channel to the list
+            channels_not_working += f'{channel_address}:{channel_port} - {channel}\n'
+            return f'[*] Channel {channel} is not working'
+
+        else: # Stream captured with channel name
+            
+            return f'[*] OK >>> Channel is working! >>> "{channel}" >>> Stream name: "{info}"'
+    
+    else:
+        # Add the broken channel to the list
+        channels_not_working += f'{channel_address}:{channel_port} - {channel}\n'
+        return f'[*] Channel {channel} is not working'
 
 def send_email(smtp_server, smtp_port, sender, receivers, channels_not_working):
     """ Function to send an email when IPTV channel failed to play """
 
     msg = MIMEText(f'The following channel(s) are not working:\n\n{channels_not_working}\n')
-    msg['Subject'] = f'IPTV stream issue for "{channel_name}" channel'
+    msg['Subject'] = f'!!! IPTV issue !!!'
     msg['From'] = f'{sender}'
     msg['To'] = f'{receivers}'
 
@@ -112,9 +202,13 @@ def send_email(smtp_server, smtp_port, sender, receivers, channels_not_working):
 
 # ================
 # End of functions
+# ================
 
 # Define the script arguments as a <args> variable
 args = parser.parse_args()
+
+# Check the OS name
+os_name = platform.system()
 
 # Check the user's input (playlist file)
 if not os.path.isfile(args.playlist):
@@ -133,25 +227,36 @@ else:
 
 # Main program
 try:
+
+    # Start timer:
+    start = time.perf_counter()
+
     # Define a string for the non-working channels
     channels_not_working = ''
 
-    # Check each channel in dictionary
-    for channel in channels_dictionary:
-        channel_address, channel_port = channels_dictionary[channel].split(':')
-        result = channel_checker(channel_address, channel_port, args.nic_ip, args.timeout)
-        if result == 0:
-            print(f'[*] OK >>> Channel is working! >>> "{channel}"')
-        else:
-            # Add the broken channel to the list
-            channels_not_working += f'{channel_address}:{channel_port} - {channel}\n'
-    
-    if email_set == 1 and channels_not_working != '':
-        send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channels_not_working)
+    # Run the checker as a multi-thread executor
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        results = [executor.submit(mass_checker, channel) for channel in channels_dictionary]
 
-    # Print the list of broken channels
+        # Print the result:
+        for item in concurrent.futures.as_completed(results):
+            print(item.result())
+
+    # Check the results and print/send the results
     if channels_not_working != '':
-        print(f'\n[*] The following channel(s) are not working:\n\n{channels_not_working}\n')
+
+        # Print the list of broken channels
+        print(f'\n[*] The following channel(s) are not working:\n\n{channels_not_working}')
+        
+        if email_set == 1:
+            send_email(args.smtp_server, args.smtp_port, args.sender, args.receivers, channels_not_working)
+
+    # Stop timer
+    finish = time.perf_counter()
+
+    # Print the execution time:
+    total_time = round(finish - start, 0)
+    print(f'\n[*] Finished in {total_time:,} second(s)')
 
 except KeyboardInterrupt:
     print('\n[*] Script has been closed!')
