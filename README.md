@@ -4,17 +4,17 @@
 
 The project contains 2 scripts:
 
-- multicast-checker.py : to check the status of the UDP channels in m3u playlist
-- multicast-scanner.py : to scan the UDP IP range and find the active streams
+- **multicast-checker.py** : to check the status of the UDP channels in m3u playlist
+- **multicast-scanner.py** : to scan the UDP IP range and find the active streams
 
 ## Installing / Getting started
 
 Both scripts are python3 compatible and use [FFprobe](https://ffmpeg.org/ffprobe.html) and [FFmpeg](https://www.ffmpeg.org/ffmpeg.html)
 Please install: https://www.ffmpeg.org/download.html
 
-You can simply run the following to see how it works:
+You can simply run the following examples to see how it works:
 
-* **multicast-checker.py:**
+### **multicast-checker.py:**
 ```shell
 python3 multicast-checker.py --playlist playlist.m3u
 ```
@@ -39,7 +39,7 @@ The script will scan all the schannels in the playlist.m3u and return the result
 (the service_name metadata field from the UDP stream will be captured in advance)
 
 
-* **multicast-scanner.py**
+### **multicast-scanner.py**
 ```shell
 python3 multicast-scanner.py --range 233.0.0.0/24
 ```
