@@ -10,7 +10,11 @@ The project contains 2 scripts:
 ## Installing / Getting started
 
 Both scripts are python3 compatible and use [FFprobe](https://ffmpeg.org/ffprobe.html) and [FFmpeg](https://www.ffmpeg.org/ffmpeg.html)
-Please install: https://www.ffmpeg.org/download.html
+
+Please install before use: 
+
+1. https://www.python.org/downloads/
+2. https://www.ffmpeg.org/download.html
 
 You can simply run the following examples to see how it works:
 
