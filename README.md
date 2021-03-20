@@ -1,7 +1,7 @@
 # multicast-checker
 To check the IPTV channels streams (UDP based)
 
-# multicast-scanner-plus
+# multicast-scanner
 The script will scan the UDP IPs range for the given ports (default '1234').
 As a result the resulting m3u file will be created.
 
