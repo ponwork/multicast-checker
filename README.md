@@ -35,8 +35,8 @@ udp://@233.99.65.4:5500
 udp://@233.99.65.5:1234
 ```
 
-The script will scan all the schannels in the playlist.m3u and return the results
-(the service_name metadata field from the UDP stream will be captured in advance)
+The script will scan all the schannels in the playlist.m3u using multithreading and return the results
+The service_name metadata field from the UDP stream will be captured in advance.
 
 Output example:
 ```
@@ -62,102 +62,92 @@ Output example:
 
 ### **multicast-scanner.py**
 ```shell
-python3 multicast-scanner.py --range 233.0.0.0/24
+python3 multicast-scanner.py --range 233.99.65.1/30
 ```
 
+The script will scan the given UDP IP range using multithreading and return the results
+The service_name metadata field from the UDP stream will be captured in advance.
+If no service_name will be found the 10 secs sample will be captured.
 
 
-Scripts are tested on Linux (Ubuntu 20.04) and MacOS (Big Sur, 11.2.2)
+Output example:
+```
+[*] IP range to scan: 233.99.65.0/30
+[*] IPs to scan: 4
+[*] Ports to scan for each IP: 1
+[*] List of the port(s) to scan: 1234
+[*] Timeout for UDP stream reply: 5 sec(s)
+[*] Timeout for stream data collection: 10 sec(s)
+[*] Sample lenght in seconds: 60 sec(s)
+
+[*] Totals:
+[*] Total items to scan: 4
+[*] Total number of /32 subnets to scan (# of threads): 4
+[*] Total number of hosts for each subnet to scan: 1 
+
+[*] Estimated maximum time to complete the task: 50 seconds
+[*] 0 day(s) 0 hour(s) 0 minute(s) 50 second(s)
+
+[*] Found opened port 1234 for 233.99.65.1
+[*] Scanning for 233.99.65.0/32 completed!
+[*] Scanning for 233.99.65.2/32 completed!
+[*] Scanning for 233.99.65.3/32 completed!
+[*] !!! No channel name found for 233.99.65.1:1234 !!!
+[*] !!! Channel added to the playlist. 233.99.65.1:1234 >>> 1 !!!
+[*] Scanning for 233.99.65.1/32 completed!
+
+[*] Recording the samples for unnamed channels...
+[*] !!! Sample for 233.99.65.1:1234 captured !!!
+
+
+[*] Finished in 14.0 second(s)
+[*] 0.0 day(s) 0.0 hour(s) 0.0 minute(s) 14.0 second(s)
+
+[*] Channels found: 1
+[*] Resulting file: scan_results_range_233.99.65.0-30.m3u
+```
+
+Scripts were tested on Linux (Ubuntu 20.04) and MacOS (Big Sur, 11.2.2)
 
 
 ### Initial Configuration
 
-Some projects require initial configuration (e.g. access tokens or keys, `npm i`).
-This is the section where you would document those requirements.
+You can find all the parameters of the scripts using the following:
 
+```shell
+python3 multicast-checker.py -h
+```
+
+```shell
+python3 multicast-scanner.py -h
+```
 
 ## Features
 
-What's all the bells and whistles this project can perform?
-* What's the main functionality
-* You can also do another thing
-* If you get really randy, you can even do this
+* checking the availability of the UDP channels;
+* send the results via email;
+* scan the UDP IP range and create a resulting M3U playlist using the metadata 'service_name'
+* record the mp4 files as a samples for the unnamed channels
 
-## Configuration
-
-Here you should write what are all of the configurations a user can enter when
-using the project.
-
-#### Argument 1
-Type: `String`  
-Default: `'default value'`
-
-State what an argument does and how you can use it. If needed, you can provide
-an example below.
-
-Example:
-```bash
-awesome-project "Some other value"  # Prints "You're nailing this readme!"
-```
-
-#### Argument 2
-Type: `Number|Boolean`  
-Default: 100
-
-Copy-paste as many of these as you need.
 
 ## Contributing
 
-When you publish something open source, one of the greatest motivations is that
-anyone can just jump in and start contributing to your project.
+The **multicast-checker.py** project was created as a tool to monitor the ISP IPTV network and sent the alerts in case of channels outages.
 
-These paragraphs are meant to welcome those kind souls to feel that they are
-needed. You should state something like:
+The **multicast-scanner.py** project was created as a tool to discover all the available IPTV channels in the ISP's network.
 
-"If you'd like to contribute, please fork the repository and use a feature
-branch. Pull requests are warmly welcome."
-
-If there's anything else the developer needs to know (e.g. the code style
-guide), you should link it here. If there's a lot of things to take into
-consideration, it is common to separate this section to its own file called
-`CONTRIBUTING.md` (or similar). If so, you should say that it exists here.
+Please feel free to comment/blame/suggest the further development
 
 ## Links
 
-Even though this information can be found inside the project on machine-readable
-format like in a .json file, it's good to include a summary of most useful
-links to humans using your project. You can include links like:
+- Project homepage: https://github.com/ponwork/multicast-checker
+- Issue tracker: https://github.com/ponwork/multicast-checker/issues
 
-- Project homepage: https://your.github.com/awesome-project/
-- Repository: https://github.com/your/awesome-project/
-- Issue tracker: https://github.com/your/awesome-project/issues
-  - In case of sensitive bugs like security vulnerabilities, please contact
-    my@email.com directly instead of using issue tracker. We value your effort
-    to improve the security and privacy of this project!
-- Related projects:
-  - Your other project: https://github.com/your/other-project/
-  - Someone else's project: https://github.com/someones/awesome-project/
-
+Data used:
+- FFmpeg/FFprobe: https://github.com/FFmpeg/FFmpeg
+- UDP Multicast: https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
+- Subnets division: https://www.davidc.net/sites/default/subnets/subnets.html
 
 ## Licensing
 
 "The code in this project is licensed under MIT license."
-
-
-==============================
-
-# multicast-checker
-To check the IPTV channels streams (UDP based)
-
-# multicast-scanner
-The script will scan the UDP IPs range for the given ports (default '1234').
-As a result the resulting m3u file will be created.
-
-If the --playlst parameter with the existing m3u file is defined the script will use all the unique ports from it
-Additional UDP ports can be defined via --port argument(s). Example below:
---port 5500 5555
-Please read the manual (run the script with -h parameter) for more info
-
-Data used:
-- https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
-- https://www.davidc.net/sites/default/subnets/subnets.html
