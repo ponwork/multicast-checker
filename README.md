@@ -4,7 +4,7 @@
 > 
 > YOUR USAGE OF THE APPLICATIONS IS AT YOUR OWN RISK
 
-!(https://github.com/ponwork/multicast-checker/blob/main/logo.jpg)
+![MULTICAST-CHECKER logo](https://github.com/ponwork/multicast-checker/blob/main/logo.jpg)
 
 The project contains 2 scripts:
 
