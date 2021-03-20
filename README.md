@@ -4,6 +4,8 @@
 > 
 > YOUR USAGE OF THE APPLICATIONS IS AT YOUR OWN RISK
 
+!(https://github.com/ponwork/multicast-checker/blob/main/logo.jpg)
+
 The project contains 2 scripts:
 
 - [**multicast-checker.py**](https://github.com/ponwork/multicast-checker/blob/main/multicast-checker.py) : to check the status of the UDP channels in m3u playlist
